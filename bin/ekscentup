@@ -1,0 +1,120 @@
+#!/usr/bin/env ruby
+# File: bin/ekscentup
+
+require 'optparse'
+require 'fileutils'
+require_relative '../lib/eks-cent'
+
+# Cari lokasi gem eksa-server agar bisa memuat server.rb
+begin
+  spec = Gem::Specification.find_by_name('eksa-server')
+  gem_root = spec.gem_dir
+  require File.join(gem_root, 'server.rb')
+rescue Gem::LoadError
+  puts "\e[31mError: Gem 'eksa-server' tidak ditemukan.\e[0m"
+  puts "Silakan instal dengan: gem install eksa-server"
+  exit 1
+end
+
+options = {
+  port: 3000,
+  host: '0.0.0.0',
+  workers: 0,
+  reload: false,
+  timeout: 30,
+  env: ENV['RACK_ENV'] || 'development'
+}
+
+OptionParser.new do |opts|
+  opts.banner = "Penggunaan: ekscentup [opsi] [file_konfigurasi]"
+  opts.separator ""
+  opts.separator "Opsi Eks-Cent:"
+
+  opts.on("-p", "--port PORT", Integer, "Port untuk server (default: 3000)") do |v|
+    options[:port] = v
+  end
+
+  opts.on("-o", "--host HOST", "Host untuk server (default: 0.0.0.0)") do |v|
+    options[:host] = v
+  end
+
+  opts.on("-w", "--workers COUNT", Integer, "Jumlah worker (untuk cluster mode)") do |v|
+    options[:workers] = v
+  end
+
+  opts.on("-R", "--reload", "Aktifkan auto-reload saat file berubah") do
+    options[:reload] = true
+  end
+
+  opts.on("-L", "--log PATH", "Path untuk file log") do |v|
+    options[:log_file] = v
+  end
+
+  opts.on("-D", "--daemonize", "Jalankan di latar belakang") do
+    options[:daemonize] = true
+  end
+
+  opts.on("-e", "--env ENV", "Set environment (development/production)") do |v|
+    options[:env] = v
+    ENV['RACK_ENV'] = v
+  end
+
+  opts.on("-v", "--version", "Tampilkan versi Eks-Cent") do
+    puts "Eks-Cent versi #{EksCent::VERSION}"
+    puts "Eksa-Server versi #{EksaServer::VERSION}" if defined?(EksaServer::VERSION)
+    exit
+  end
+
+  opts.on("-h", "--help", "Tampilkan pesan bantuan ini") do
+    puts opts
+    exit
+  end
+end.parse!
+
+# File konfigurasi default adalah config.eks
+config_file = ARGV[0] || 'config.eks'
+config_path = File.expand_path(config_file)
+
+unless File.exist?(config_path)
+  puts "\e[31mError: File '#{config_file}' tidak ditemukan.\e[0m"
+  exit 1
+end
+
+puts "\e[32m[Eks-Cent] Memuat aplikasi dari #{config_file}...\e[0m"
+
+# Set logger global EksCent jika ada opsi -L
+if options[:log_file]
+  EksCent.logger = File.open(options[:log_file], 'a')
+  EksCent.logger.sync = true
+end
+
+# Check Secret Key di mode produksi
+if EksCent.production?
+  default_key = '1e8a93e80c85b1a6c4b69d9c2e8b2a1a8e1b1d8c1c2e1f2g1h1i1j1k1l1m1n1o'
+  if EksCent.secret_key_base == default_key
+    puts "\e[33m[PERINGATAN] Aplikasi berjalan di mode PRODUCTION dengan SECRET_KEY_BASE default.\e[0m"
+    puts "\e[33mSegera atur EKS_CENT_SECRET_KEY_BASE di environment variable Anda untuk keamanan!\e[0m"
+  end
+end
+
+puts "\e[34m[Eks-Cent] Environment: #{EksCent.env}\e[0m"
+
+# Load aplikasi via Builder
+begin
+  app = EksCent.load(config_path)
+rescue => e
+  puts "\e[31mGagal memuat aplikasi: #{e.message}\e[0m"
+  puts e.backtrace.first(5).join("\n")
+  exit 1
+end
+
+# Jalankan menggunakan EksaServerCore
+begin
+  server = EksaServerCore.new(app, options)
+  server.start
+rescue Interrupt
+  puts "\n\e[33mMenutup server Eks-Cent...\e[0m"
+rescue => e
+  puts "\e[31mServer error: #{e.message}\e[0m"
+  exit 1
+end

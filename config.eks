@@ -1,0 +1,44 @@
+# File: config.eks
+# Contoh konfigurasi untuk Eks-Cent
+
+use EksCent::Middleware::ContentSecurity
+use EksCent::Middleware::Session
+use EksCent::Middleware::Static, root: 'public'
+use EksCent::Middleware::Logger
+use EksCent::Middleware::ShowExceptions
+
+# Aplikasi Utama
+# Aplikasi Utama menggunakan Router
+router = EksCent::Router.new do
+  get '/' do |req, res|
+    # Contoh penggunaan session
+    req.session['visits'] ||= 0
+    req.session['visits'] += 1
+    
+    res.write "<h1>Selamat Datang di Eks-Cent!</h1>"
+    res.write "<p>Ini adalah framework tanpa dependensi.</p>"
+    res.write "<p>Jumlah kunjungan Anda: <strong>#{req.session['visits']}</strong></p>"
+    res.write "<p>Cobalah akses <a href='/error'>/error</a> untuk melihat middleware ShowExceptions.</p>"
+  end
+
+  get '/welcome' do |req, res|
+    # Contoh penggunaan ERB rendering dan h helper
+    res.render 'test', name: req.params['name'] || 'Tamu'
+  end
+
+  get '/hello/:name' do |req, res|
+    name = req.params['name'] || 'Fulan'
+    res.write "Halo, #{name}! Senang bertemu Anda di #{req.user_agent}."
+  end
+
+  get '/hello' do |req, res|
+    name = req.params['name'] || 'Fulan'
+    res.write "Halo, #{name}! Senang bertemu Anda di #{req.user_agent}."
+  end
+
+  get '/error' do |req, res|
+    raise "Waduh! Ada kesalahan yang disengaja di sini."
+  end
+end
+
+run router

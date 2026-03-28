@@ -1,0 +1,29 @@
+# Ruby
+*.gem
+*.rbc
+/.config
+/doc/
+/lib/bundler/man/
+pkg/
+spec/reports/
+test/tmp/
+test/version_tmp/
+tmp/
+*.swp
+*~
+.DS_Store
+
+# Eks-Cent Logs & Secrets
+log/*.log
+.env
+.env.*
+!.env.example
+
+# Bundle
+.bundle/
+vendor/bundle
+
+# IDEs
+.idea/
+.vscode/
+.ruby-lsp/
