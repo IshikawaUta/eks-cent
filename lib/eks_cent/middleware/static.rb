@@ -11,7 +11,9 @@ module EksCent
         '.jpg'  => 'image/jpeg',
         '.gif'  => 'image/gif',
         '.ico'  => 'image/x-icon',
-        '.txt'  => 'text/plain'
+        '.txt'  => 'text/plain',
+        '.xml'  => 'application/xml',
+        '.svg'  => 'image/svg+xml'
       }
 
       def initialize(app, root: 'public')
