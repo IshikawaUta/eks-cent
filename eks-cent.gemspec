@@ -19,6 +19,7 @@ Gem::Specification.new do |spec|
 
   # Runtime dependencies
   spec.add_dependency "eksa-server", "~> 1.1"
+  spec.add_dependency "base64"
 
   spec.required_ruby_version = Gem::Requirement.new(">= 2.6.0")
 
