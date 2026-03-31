@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/logo.webp" alt="Eks-Cent Logo" width="200" />
+  <img src="images/logo.webp" alt="Eks-Cent Logo" width="600" />
 </p>
 
 # Eks-Cent Framework v4.0.0 🚀
