@@ -1,16 +1,21 @@
-# Eks-Cent: Lightweight Rack-like Communication Interface for Ruby.
+# Eks-Cent: Lightweight Eks-style Communication Interface for Ruby.
 
 require_relative 'eks_cent/version'
 require_relative 'eks_cent/request'
 require_relative 'eks_cent/response'
 require_relative 'eks_cent/builder'
 require_relative 'eks_cent/router'
+require_relative 'eks_cent/url_map'
+require_relative 'eks_cent/cascade'
 require_relative 'eks_cent/mock_request'
 require_relative 'eks_cent/middleware/logger'
 require_relative 'eks_cent/middleware/session'
 require_relative 'eks_cent/middleware/content_security'
 require_relative 'eks_cent/middleware/show_exceptions'
 require_relative 'eks_cent/middleware/static'
+require_relative 'eks_cent/middleware/method_override'
+require_relative 'eks_cent/middleware/runtime'
+require_relative 'eks_cent/middleware/head'
 
 module EksCent
   
@@ -22,7 +27,7 @@ module EksCent
   self.secret_key_base = ENV['EKS_CENT_SECRET_KEY_BASE'] || '1e8a93e80c85b1a6c4b69d9c2e8b2a1a8e1b1d8c1c2e1f2g1h1i1j1k1l1m1n1o'
 
   def self.env
-    ENV['RACK_ENV'] || ENV['EKS_CENT_ENV'] || 'development'
+    ENV['EKS_ENV'] || ENV['RACK_ENV'] || ENV['EKS_CENT_ENV'] || 'development'
   end
 
   def self.production?

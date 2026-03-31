@@ -1,44 +1,50 @@
 # File: config.eks
-# Contoh konfigurasi untuk Eks-Cent
+# Contoh konfigurasi lanjutan untuk Eks-Cent v4.0.0
 
+# 1. Globals & Security Middlewares
+use EksCent::Middleware::Runtime         # Header X-Runtime otomatis
+use EksCent::Middleware::Head            # Penanganan HEAD request otomatis
+use EksCent::Middleware::MethodOverride  # Dukungan _method=DELETE/PUT via form
 use EksCent::Middleware::ContentSecurity
 use EksCent::Middleware::Session
-use EksCent::Middleware::Static, root: 'public'
 use EksCent::Middleware::Logger
 use EksCent::Middleware::ShowExceptions
 
-# Aplikasi Utama
-# Aplikasi Utama menggunakan Router
-router = EksCent::Router.new do
+# 2. Aplikasi API (Dipetakan ke /api)
+map "/api" do
+  router_api = EksCent::Router.new do
+    get "/status" do |req, res|
+      res.set_header 'Content-Type', 'application/json'
+      res.write "{\"status\": \"online\", \"version\": \"#{EksCent::VERSION}\"}"
+    end
+    
+    put "/update" do |req, res|
+      res.write "Method PUT diterima (via MethodOverride). Method asli: #{req.env['eks_cent.original_method']}"
+    end
+  end
+  run router_api
+end
+
+# 3. Aplikasi Web Utama (Dipetakan ke root /)
+router_web = EksCent::Router.new do
   get '/' do |req, res|
-    # Contoh penggunaan session
     req.session['visits'] ||= 0
     req.session['visits'] += 1
     
-    res.write "<h1>Selamat Datang di Eks-Cent!</h1>"
-    res.write "<p>Ini adalah framework tanpa dependensi.</p>"
-    res.write "<p>Jumlah kunjungan Anda: <strong>#{req.session['visits']}</strong></p>"
-    res.write "<p>Cobalah akses <a href='/error'>/error</a> untuk melihat middleware ShowExceptions.</p>"
-  end
-
-  get '/welcome' do |req, res|
-    # Contoh penggunaan ERB rendering dan h helper
-    res.render 'test', name: req.params['name'] || 'Tamu'
-  end
-
-  get '/hello/:name' do |req, res|
-    name = req.params['name'] || 'Fulan'
-    res.write "Halo, #{name}! Senang bertemu Anda di #{req.user_agent}."
-  end
-
-  get '/hello' do |req, res|
-    name = req.params['name'] || 'Fulan'
-    res.write "Halo, #{name}! Senang bertemu Anda di #{req.user_agent}."
+    res.write "<h1>Selamat Datang di Eks-Cent v#{EksCent::VERSION}!</h1>"
+    res.write "<p>Fitur baru: <strong>URL Mapping</strong> & <strong>Runtime Tracking</strong>.</p>"
+    res.write "<p>Kunjungan: <strong>#{req.session['visits']}</strong></p>"
+    res.write "<hr>"
+    res.write "<ul>"
+    res.write "  <li>Akses API: <a href='/api/status'>/api/status</a></li>"
+    res.write "  <li>Gunakan MethodOverride: <form action='/api/update' method='post' style='display:inline'><input type='hidden' name='_method' value='PUT'><button type='submit'>Kirim PUT via POST</button></form></li>"
+    res.write "  <li>Coba Error: <a href='/error'>/error</a></li>"
+    res.write "</ul>"
   end
 
   get '/error' do |req, res|
-    raise "Waduh! Ada kesalahan yang disengaja di sini."
+    raise "Kesalahan yang disengaja untuk demonstrasi v4.0.0."
   end
 end
 
-run router
+run router_web

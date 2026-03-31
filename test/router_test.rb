@@ -36,12 +36,12 @@ class RouterTest < Test::Unit::TestCase
   end
 
   def test_post_method
-    # Mock rack.input for POST
+    # Mock eks.input for POST
     input = StringIO.new("data=penting")
     env = { 
       'REQUEST_METHOD' => 'POST', 
       'PATH_INFO' => '/submit',
-      'rack.input' => input,
+      'eks.input' => input,
       'CONTENT_TYPE' => 'application/x-www-form-urlencoded'
     }
     status, _headers, body = @router.call(env)

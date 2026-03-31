@@ -22,7 +22,7 @@ options = {
   workers: 0,
   reload: false,
   timeout: 30,
-  env: ENV['RACK_ENV'] || 'development'
+  env: ENV['EKS_ENV'] || ENV['RACK_ENV'] || 'development'
 }
 
 OptionParser.new do |opts|
@@ -56,7 +56,7 @@ OptionParser.new do |opts|
 
   opts.on("-e", "--env ENV", "Set environment (development/production)") do |v|
     options[:env] = v
-    ENV['RACK_ENV'] = v
+    ENV['EKS_ENV'] = v
   end
 
   opts.on("-v", "--version", "Tampilkan versi Eks-Cent") do
@@ -99,22 +99,86 @@ end
 
 puts "\e[34m[Eks-Cent] Environment: #{EksCent.env}\e[0m"
 
-# Load aplikasi via Builder
-begin
-  app = EksCent.load(config_path)
-rescue => e
-  puts "\e[31mGagal memuat aplikasi: #{e.message}\e[0m"
-  puts e.backtrace.first(5).join("\n")
-  exit 1
+# Fungsi untuk menjalankan server
+def start_server(config_path, options)
+  begin
+    # Load aplikasi via Builder di setiap start agar config direfresh
+    app = EksCent.load(config_path)
+    server = EksaServerCore.new(app, options.merge(reload: false))
+    server.start
+  rescue Interrupt
+    # Biarkan parent menangani Interrupt
+    exit 0
+  rescue => e
+    puts "\e[31m[Eks-Cent] Server error: #{e.message}\e[0m"
+    puts e.backtrace.first(5).join("\n")
+    exit 1
+  end
 end
 
-# Jalankan menggunakan EksaServerCore
-begin
-  server = EksaServerCore.new(app, options)
-  server.start
-rescue Interrupt
-  puts "\n\e[33mMenutup server Eks-Cent...\e[0m"
-rescue => e
-  puts "\e[31mServer error: #{e.message}\e[0m"
-  exit 1
+if options[:reload] && Process.respond_to?(:fork)
+  puts "\e[34m[Eks-Cent] Auto-reload aktif. Memantau perubahan file di direktori ini...\e[0m"
+  
+  trap("INT") do
+    puts "\n\e[33mMenutup Reloader Eks-Cent...\e[0m"
+    Process.kill("INT", @child_pid) rescue nil if @child_pid
+    exit 0
+  end
+
+  loop do
+    @child_pid = fork do
+      start_server(config_path, options)
+    end
+
+    # Pemantau file sederhana (cek mtime setiap detik)
+    watched_extensions = %w[.rb .eks .erb .html .css .js]
+    initial_mtimes = {}
+    
+    # Inisialisasi daftar file
+    Dir.glob("**/*").each do |f|
+      next unless watched_extensions.include?(File.extname(f))
+      initial_mtimes[f] = File.mtime(f) rescue nil
+    end
+
+    loop do
+      sleep 1
+      
+      # Periksa perubahan
+      changed = false
+      Dir.glob("**/*").each do |f|
+        next unless watched_extensions.include?(File.extname(f))
+        current_mtime = File.mtime(f) rescue nil
+        if current_mtime && (!initial_mtimes[f] || current_mtime > initial_mtimes[f])
+          changed = true
+          break
+        end
+      end
+
+      if changed
+        puts "\e[34m[Reloader] Perubahan terdeteksi. Me-restart server...\e[0m"
+        Process.kill("INT", @child_pid) rescue nil
+        Process.wait(@child_pid) rescue nil
+        break # Keluar ke loop untuk fork baru
+      end
+
+      # Cek jika proses anak berhenti mendadak
+      if (pid = Process.waitpid(@child_pid, Process::WNOHANG))
+        puts "\e[31m[Reloader] Server (PID: #{pid}) berhenti. Me-restart dalam 2 detik...\e[0m"
+        sleep 2
+        break
+      end
+    end
+  end
+else
+  # Mode Standar (Tanpa Reload)
+  begin
+    app = EksCent.load(config_path)
+    server = EksaServerCore.new(app, options)
+    server.start
+  rescue Interrupt
+    puts "\n\e[33mMenutup server Eks-Cent...\e[0m"
+  rescue => e
+    puts "\e[31mServer error: #{e.message}\e[0m"
+    exit 1
+  end
 end

@@ -10,7 +10,23 @@ module EksCent
       }
       @prefix = ''
       @current_middlewares = []
+      @not_found_block = nil
+      @error_block = nil
       instance_eval(&block) if block_given?
+    end
+
+    def not_found(&block)
+      @not_found_block = block
+    end
+
+    def error(&block)
+      @error_block = block
+    end
+
+    def halt(res, status = nil, body = nil)
+      res.status = status if status
+      res.write(body) if body
+      throw(:halt)
     end
 
     def get(path, &block)    add_route('GET', path, &block) end
@@ -52,8 +68,19 @@ module EksCent
         # Wrapped application with route-specific middlewares
         app = proc do |e| 
           req_i = Request.new(e)
-          res_i = Response.new
-          instance_exec(req_i, res_i, &route[:block])
+          res_i = Response.new(request: req_i)
+          begin
+            catch(:halt) do
+              instance_exec(req_i, res_i, &route[:block])
+            end
+          rescue => err
+            if @error_block
+              res_i.status = 500
+              instance_exec(err, req_i, res_i, &@error_block)
+            else
+              raise err
+            end
+          end
           res_i.finish
         end
         route[:middlewares].reverse_each { |m| app = m.new(app) }
@@ -61,11 +88,27 @@ module EksCent
         _status, headers, body = app.call(env)
         [_status, headers, body]
       else
-        [404, { 'Content-Type' => 'text/plain' }, ["Not Found"]]
+        handle_not_found(env)
       end
     end
 
     private
+
+    def handle_not_found(env)
+      req = Request.new(env)
+      res = Response.new(request: req)
+      res.status = 404
+
+      if @not_found_block
+        instance_exec(req, res, &@not_found_block)
+        res.finish
+      elsif File.exist?(File.join('views', '404.erb'))
+        res.render '404'
+        res.finish
+      else
+        [404, { 'Content-Type' => 'text/plain' }, ["Not Found"]]
+      end
+    end
 
     def add_route(method, path, &block)
       keys = []

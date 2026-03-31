@@ -21,10 +21,16 @@ module EksCent
         'PATH_INFO'      => path,
         'QUERY_STRING'   => query || '',
         'HTTP_USER_AGENT' => opts[:user_agent] || 'EksCent-MockRequest',
-        'rack.input'     => StringIO.new(opts[:body] || '')
       }.merge(opts[:env] || {})
       
-      @app.call(env)
+      env['eks.input']   ||= StringIO.new(opts[:body] || '')
+      env['rack.input']  ||= env['eks.input']
+      env['eks.version'] ||= [1, 3]
+      env['rack.version'] ||= env['eks.version']
+      
+      status, headers, body = @app.call(env)
+      require_relative 'mock_response' unless defined?(EksCent::MockResponse)
+      MockResponse.new(status, headers, body)
     end
   end
 end

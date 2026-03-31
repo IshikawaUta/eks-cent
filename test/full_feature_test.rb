@@ -46,7 +46,7 @@ class FullFeatureTest < Test::Unit::TestCase
     input = JSON.dump({ data: 'mantap' })
     env = { 
       'CONTENT_TYPE' => 'application/json',
-      'rack.input' => StringIO.new(input)
+      'eks.input' => StringIO.new(input)
     }
     _status, _headers, body = @mock.post('/api/json', env: env)
     
@@ -57,7 +57,7 @@ class FullFeatureTest < Test::Unit::TestCase
   def test_namespace_routing
     status, _headers, _body = @mock.post('/api/json', env: { 
       'CONTENT_TYPE' => 'application/json',
-      'rack.input' => StringIO.new('{"data":1}') 
+      'eks.input' => StringIO.new('{"data":1}') 
     })
     assert_equal 200, status
   end
